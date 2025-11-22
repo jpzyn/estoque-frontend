@@ -1,0 +1,13 @@
+target/
+*.class
+*.db
+*.log
+*.pid
+.DS_Store
+.idea/
+.vscode/
+bin/
+estoque.db
+servidor.log
+servidor.pid
+
