@@ -19,7 +19,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JFormattedTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.text.MaskFormatter;
+import java.text.ParseException;
 
 import controller.EstoqueController;
 
@@ -239,11 +242,107 @@ public class MenuPrincipal extends JFrame {
     }
 
     private JPanel criarPainelMovimentacoes() {
-        JPanel painel = new JPanel(new BorderLayout());
-        JLabel label = new JLabel("Em desenvolvimento...", JLabel.CENTER);
-        label.setFont(label.getFont().deriveFont(18f));
-        painel.add(label, BorderLayout.CENTER);
-        return painel;
+        JComboBox<String> comboProduto = new JComboBox<>();
+        JComboBox<String> comboTipo = new JComboBox<>(new String[]{"ENTRADA", "SAIDA"});
+        JTextField campoQuantidade = new JTextField();
+        JFormattedTextField campoData = criarCampoData();
+        JTextArea areaResultado = criarAreaResultado();
+
+        atualizarProdutos(comboProduto);
+
+        JButton botaoAtualizarProdutos = new JButton("🔄");
+        botaoAtualizarProdutos.setPreferredSize(new Dimension(30, 25));
+        botaoAtualizarProdutos.setMaximumSize(new Dimension(30, 25));
+        botaoAtualizarProdutos.setMinimumSize(new Dimension(30, 25));
+        botaoAtualizarProdutos.setToolTipText("Atualizar produtos");
+        botaoAtualizarProdutos.addActionListener(e -> atualizarProdutos(comboProduto));
+
+        JButton botaoRegistrar = new JButton("Registrar Movimentação");
+        botaoRegistrar.addActionListener(e -> {
+            try {
+                String produtoSelecionado = (String) comboProduto.getSelectedItem();
+                if (produtoSelecionado == null || produtoSelecionado.isEmpty() || 
+                    produtoSelecionado.equals("(Nenhum produto cadastrado)") ||
+                    produtoSelecionado.equals("(Erro ao carregar produtos)")) {
+                    JOptionPane.showMessageDialog(this, "Selecione um produto válido. Cadastre um produto primeiro na aba 'Produtos'.", "Dados inválidos", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                String tipoSelecionado = (String) comboTipo.getSelectedItem();
+                int quantidade = Integer.parseInt(campoQuantidade.getText());
+                String data = campoData.getText();
+
+                if (data == null || data.trim().isEmpty() || data.contains("_")) {
+                    JOptionPane.showMessageDialog(this, "Preencha a data corretamente (DD/MM/AAAA).", "Dados inválidos", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                String resposta = controller.registrarMovimentacao(
+                        produtoSelecionado,
+                        tipoSelecionado,
+                        quantidade,
+                        data
+                );
+                areaResultado.setText(resposta);
+
+                atualizarProdutos(comboProduto);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "A quantidade deve ser um número inteiro.", "Dados inválidos", JOptionPane.WARNING_MESSAGE);
+            }
+        });
+
+        JButton botaoListar = new JButton("Listar Movimentações");
+        botaoListar.addActionListener(e -> atualizarAreaComLista(areaResultado, controller.listarMovimentacoes()));
+
+        JPanel formulario = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(5, 5, 5, 5);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.2;
+        formulario.add(new JLabel("Produto"), gbc);
+
+        JPanel painelProduto = new JPanel(new BorderLayout(5, 0));
+        painelProduto.add(comboProduto, BorderLayout.CENTER);
+        painelProduto.add(botaoAtualizarProdutos, BorderLayout.EAST);
+        
+        gbc.gridx = 1;
+        gbc.weightx = 0.8;
+        formulario.add(painelProduto, gbc);
+
+        gbc.gridy++;
+        gbc.gridx = 0;
+        gbc.weightx = 0.2;
+        formulario.add(new JLabel("Tipo"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 0.8;
+        formulario.add(comboTipo, gbc);
+
+        gbc.gridy++;
+        gbc.gridx = 0;
+        gbc.weightx = 0.2;
+        formulario.add(new JLabel("Quantidade"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 0.8;
+        formulario.add(campoQuantidade, gbc);
+
+        gbc.gridy++;
+        gbc.gridx = 0;
+        gbc.weightx = 0.2;
+        formulario.add(new JLabel("Data"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 0.8;
+        formulario.add(campoData, gbc);
+        formulario.setBorder(BorderFactory.createTitledBorder("Dados"));
+
+        JPanel botoes = criarPainelBotoes(botaoRegistrar, botaoListar);
+
+        return montarPainelCompleto(formulario, botoes, areaResultado);
     }
 
     private JPanel criarPainelRelatorios() {
@@ -316,6 +415,56 @@ public class MenuPrincipal extends JFrame {
         } catch (Exception e) {
             combo.addItem("(Erro ao carregar categorias)");
         }
+    }
+
+    private void atualizarProdutos(JComboBox<String> combo) {
+        combo.removeAllItems();
+        try {
+            List<String> produtos = controller.listarProdutos();
+            
+            if (produtos != null && !produtos.isEmpty()) {
+                for (String linha : produtos) {
+                    if (linha != null) {
+                        String linhaLimpa = linha.trim();
+
+                        if (linhaLimpa.isEmpty() || 
+                            linhaLimpa.startsWith("ERROR") || 
+                            linhaLimpa.startsWith("Falha na comunicação") ||
+                            (linhaLimpa.startsWith("SUCCESS|") && linhaLimpa.length() == 8)) {
+                            continue;
+                        }
+
+                        if (linhaLimpa.startsWith("SUCCESS|")) {
+                            linhaLimpa = linhaLimpa.substring(8).trim();
+                        }
+
+                        if (!linhaLimpa.isEmpty()) {
+                            combo.addItem(linhaLimpa);
+                        }
+                    }
+                }
+            }
+            
+            if (combo.getItemCount() == 0) {
+                combo.addItem("(Nenhum produto cadastrado)");
+            }
+        } catch (Exception e) {
+            combo.addItem("(Erro ao carregar produtos)");
+        }
+    }
+
+    private JFormattedTextField criarCampoData() {
+        JFormattedTextField campoData = null;
+        try {
+            MaskFormatter mask = new MaskFormatter("##/##/####");
+            mask.setPlaceholderCharacter('_');
+            mask.setValidCharacters("0123456789");
+            campoData = new JFormattedTextField(mask);
+            campoData.setColumns(10);
+        } catch (ParseException e) {
+            campoData = new JFormattedTextField();
+        }
+        return campoData;
     }
 
     public static void main(String[] args) {

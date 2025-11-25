@@ -49,6 +49,19 @@ public class EstoqueController {
         return enviarComoLista("listarCategorias", Collections.emptyMap());
     }
 
+    public String registrarMovimentacao(String produto, String tipo, int quantidade, String data) {
+        Map<String, String> dados = new HashMap<>();
+        dados.put("produto", produto);
+        dados.put("tipo", tipo);
+        dados.put("quantidade", String.valueOf(quantidade));
+        dados.put("data", data);
+        return enviar("registrarMovimentacao", dados);
+    }
+
+    public List<String> listarMovimentacoes() {
+        return enviarComoLista("listarMovimentacoes", Collections.emptyMap());
+    }
+
     private String enviar(String acao, Map<String, String> dados) {
         try {
             return clienteSocket.enviar(acao, dados);
